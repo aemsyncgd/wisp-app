@@ -1,0 +1,286 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_PRISMA_URL")
+}
+
+model Admin {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      AdminRole @default(ADMIN)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  auditLogs AuditLog[]
+
+  @@map("admins")
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+}
+
+model Customer {
+  id               String   @id @default(cuid())
+  firstName        String
+  lastName         String
+  email            String   @unique
+  phone            String?
+  taxId            String?  @unique
+  businessName     String?
+  accountStatus    ServiceStatus @default(ACTIVE)
+  contractDate     DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  addresses        Address[]
+  customerServices CustomerService[]
+  invoices         Invoice[]
+  payments         Payment[]
+  bandwidthLogs    BandwidthLog[]
+  auditLogs        AuditLog[]
+
+  @@map("customers")
+}
+
+model ServicePlan {
+  id              String   @id @default(cuid())
+  name            String   @unique
+  downloadSpeed   Int      // in Mbps
+  uploadSpeed     Int      // in Mbps
+  monthlyPrice    Float
+  setupFee        Float    @default(0)
+  dataLimit       Int?     // in GB, null for unlimited
+  contractMonths  Int      @default(12)
+  description     String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  customerServices CustomerService[]
+
+  @@map("service_plans")
+}
+
+model CustomerService {
+  id               String   @id @default(cuid())
+  customerId       String
+  customer         Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  servicePlanId    String
+  servicePlan      ServicePlan @relation(fields: [servicePlanId], references: [id])
+
+  pppUsername      String   @unique // MikroTik PPP Secret username
+  pppPassword      String
+  status           ServiceStatus @default(ACTIVE)
+  startDate        DateTime @default(now())
+  renewalDate      DateTime
+  cancelDate       DateTime?
+  lastBillingDate  DateTime?
+
+  ipAddress        String?  // WAN IP assigned
+  publicIp         String?  // Public IP for geolocation
+  bandwidthUsed    Float    @default(0) // in GB
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  invoices         Invoice[]
+  payments         Payment[]
+  bandwidthLogs    BandwidthLog[]
+
+  @@unique([customerId, servicePlanId])
+  @@map("customer_services")
+}
+
+model Invoice {
+  id               String   @id @default(cuid())
+  invoiceNumber    String   @unique
+  customerId       String
+  customer         Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  customerServiceId String?
+  customerService   CustomerService? @relation(fields: [customerServiceId], references: [id], onDelete: SetNull)
+
+  amount           Float
+  taxAmount        Float    @default(0)
+  totalAmount      Float
+  description      String?
+
+  issueDate        DateTime @default(now())
+  dueDate          DateTime
+  paidDate         DateTime?
+
+  status           InvoiceStatus @default(PENDING)
+  paymentMethod    PaymentMethod?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  payments         Payment[]
+
+  @@index([customerId])
+  @@index([status])
+  @@map("invoices")
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  DEBIT_CARD
+  BANK_TRANSFER
+  PAYPAL
+  MERCADO_PAGO
+  CASH
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum ServiceStatus {
+  ACTIVE
+  SUSPENDED
+  INACTIVE
+  PENDING
+}
+
+model Payment {
+  id               String   @id @default(cuid())
+  customerId       String
+  customer         Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  invoiceId        String?
+  invoice          Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  customerServiceId String?
+  customerService   CustomerService? @relation(fields: [customerServiceId], references: [id], onDelete: SetNull)
+
+  amount           Float
+  paymentMethod    PaymentMethod
+  transactionId    String?  @unique
+  reference        String?
+
+  status           PaymentStatus @default(PENDING)
+  processedDate    DateTime?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([customerId])
+  @@index([status])
+  @@map("payments")
+}
+
+model BandwidthLog {
+  id               String   @id @default(cuid())
+  customerId       String
+  customer         Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  customerServiceId String
+  customerService   CustomerService @relation(fields: [customerServiceId], references: [id], onDelete: Cascade)
+
+  downloadUsage    Float    // in GB
+  uploadUsage      Float    // in GB
+  totalUsage       Float    // in GB
+
+  logDate          DateTime
+  createdAt        DateTime @default(now())
+
+  @@index([customerId])
+  @@index([customerServiceId])
+  @@index([logDate])
+  @@map("bandwidth_logs")
+}
+
+model Address {
+  id           String   @id @default(cuid())
+  customerId   String
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  addressLine1 String
+  addressLine2 String?
+  city         String
+  state        String
+  zipCode      String
+  country      String
+  latitude     Float?
+  longitude    Float?
+
+  routerId     String?
+  router       Router?  @relation(fields: [routerId], references: [id], onDelete: SetNull)
+
+  addressListName String? // MikroTik Address List name (ACTIVE/SUSPENDED)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("addresses")
+}
+
+model Router {
+  id               String   @id @default(cuid())
+  name             String   @unique
+  ipAddress        String   @unique
+  port             Int      @default(8728)
+  username         String
+  password         String
+
+  model            String?
+  serialNumber     String?
+  firmwareVersion  String?
+
+  isActive         Boolean  @default(true)
+  lastHealthCheck  DateTime?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  addresses        Address[]
+
+  @@map("routers")
+}
+
+model AuditLog {
+  id               String   @id @default(cuid())
+  adminId          String?
+  admin            Admin?   @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  customerId       String?
+  customer         Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  action           String
+  entityType       String   // e.g., "Customer", "Invoice", "Service"
+  entityId         String?
+  changes          Json?    // JSON object with before/after values
+  ipAddress        String?
+  userAgent        String?
+
+  createdAt        DateTime @default(now())
+
+  @@index([adminId])
+  @@index([customerId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
