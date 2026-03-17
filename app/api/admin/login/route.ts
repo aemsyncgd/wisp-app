@@ -1,4 +1,4 @@
-import { signIn } from "@/auth";
+import { signIn } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
 export async function POST(request: Request) {
