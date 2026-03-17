@@ -51,20 +51,20 @@ export async function PUT(
       return NextResponse.json({ error: "Customer not found" }, { status: 404 });
     }
 
+    // Split name into firstName and lastName
+    const nameParts = (body.name || (oldCustomer.firstName + " " + oldCustomer.lastName)).split(" ");
+    const firstName = nameParts[0];
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : " ";
+
     const customer = await prisma.customer.update({
       where: { id: params.id },
       data: {
-        name: body.name,
+        firstName,
+        lastName,
         email: body.email,
         phone: body.phone || null,
-        documentId: body.documentId || null,
-        status: body.status || "ACTIVE",
-        address: body.address || null,
-        city: body.city || null,
-        state: body.state || null,
-        zipCode: body.zipCode || null,
-        notes: body.notes || null,
-        contactPerson: body.contactPerson || null,
+        taxId: body.documentId || null,
+        accountStatus: body.status || "ACTIVE",
       },
     });
 
@@ -76,9 +76,7 @@ export async function PUT(
         action: "update_customer",
         entityType: "Customer",
         entityId: customer.id,
-        description: `Updated customer: ${customer.name}`,
-        oldValues: JSON.stringify(oldCustomer),
-        newValues: JSON.stringify(customer),
+        changes: { old: oldCustomer, new: customer } as any,
       },
     });
 
@@ -123,8 +121,7 @@ export async function DELETE(
         action: "delete_customer",
         entityType: "Customer",
         entityId: params.id,
-        description: `Deleted customer: ${customer.name}`,
-        oldValues: JSON.stringify(customer),
+        changes: customer as any,
       },
     });
 

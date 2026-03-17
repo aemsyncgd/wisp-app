@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { Role } from "@prisma/client";
 
 /**
  * POST /api/setup/create-admin
@@ -46,16 +47,16 @@ export async function POST(request: NextRequest) {
         email,
         password: hashedPassword,
         name,
-        role: "SUPER_ADMIN",
+        role: Role.ADMIN, // SUPER_ADMIN is not in the schema enum
         active: true,
       },
     });
 
-    console.log(`[Setup] Created super admin: ${email}`);
+    console.log(`[Setup] Created admin: ${email}`);
 
     return NextResponse.json(
       {
-        message: "Super admin created successfully",
+        message: "Admin created successfully",
         admin: {
           id: admin.id,
           email: admin.email,

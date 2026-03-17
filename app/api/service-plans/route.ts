@@ -48,8 +48,6 @@ export async function POST(request: NextRequest) {
       monthlyPrice,
       setupFee = 0,
       dataLimit,
-      contractMonths = 12,
-      description,
     } = body;
 
     if (
@@ -64,16 +62,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Convert string speeds to numbers if necessary
     const plan = await prisma.servicePlan.create({
       data: {
         name,
-        downloadSpeed,
-        uploadSpeed,
-        monthlyPrice,
-        setupFee,
-        dataLimit: dataLimit || null,
-        contractMonths,
-        description: description || "",
+        downloadSpeed: typeof downloadSpeed === "string" ? parseFloat(downloadSpeed) : downloadSpeed,
+        uploadSpeed: typeof uploadSpeed === "string" ? parseFloat(uploadSpeed) : uploadSpeed,
+        monthlyPrice: typeof monthlyPrice === "string" ? parseFloat(monthlyPrice) : monthlyPrice,
+        setupFee: typeof setupFee === "string" ? parseFloat(setupFee) : setupFee,
+        dataLimit: dataLimit ? (typeof dataLimit === "string" ? parseFloat(dataLimit) : dataLimit) : null,
         isActive: true,
       },
     });
@@ -85,7 +82,7 @@ export async function POST(request: NextRequest) {
         action: "create_service_plan",
         entityType: "ServicePlan",
         entityId: plan.id,
-        changes: JSON.stringify(plan),
+        changes: plan as any,
       },
     });
 

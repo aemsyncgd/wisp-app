@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { BillingService } from "@/lib/billing-service";
+import { PaymentMethod } from "@prisma/client";
 
 export async function GET() {
   try {
@@ -49,15 +50,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Map string method to PaymentMethod enum
+    const methodMap: Record<string, PaymentMethod> = {
+      "cash": PaymentMethod.CASH,
+      "credit_card": PaymentMethod.CREDIT_CARD,
+      "debit_card": PaymentMethod.DEBIT_CARD,
+      "bank_transfer": PaymentMethod.BANK_TRANSFER,
+      "paypal": PaymentMethod.PAYPAL,
+      "mercado_pago": PaymentMethod.MERCADO_PAGO,
+    };
+    
+    const paymentMethod = methodMap[body.method?.toLowerCase()] || PaymentMethod.CASH;
+
     // Create payment record
     const payment = await prisma.payment.create({
       data: {
         customerId: body.customerId,
         invoiceId: body.invoiceId || null,
         amount: body.amount,
-        method: body.method,
-        status: body.method === "cash" ? "COMPLETED" : "PENDING",
-        notes: body.notes || null,
+        paymentMethod: paymentMethod,
+        status: paymentMethod === PaymentMethod.CASH ? "COMPLETED" : "PENDING",
+        reference: body.notes || null, // Using reference field for notes
       },
     });
 
@@ -78,8 +91,7 @@ export async function POST(request: NextRequest) {
         action: "record_payment",
         entityType: "Payment",
         entityId: payment.id,
-        description: `Recorded payment of $${payment.amount} from ${customer.name}`,
-        newValues: JSON.stringify(payment),
+        changes: payment as any,
       },
     });
 

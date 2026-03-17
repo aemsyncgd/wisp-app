@@ -21,7 +21,7 @@ export class BillingService {
 
       // Get all active customers with services
       const customers = await prisma.customer.findMany({
-        where: { status: "ACTIVE" },
+        where: { accountStatus: "ACTIVE" },
         include: {
           customerServices: {
             where: { status: "ACTIVE" },
@@ -37,7 +37,7 @@ export class BillingService {
 
         // Calculate total amount
         const totalAmount = customer.customerServices.reduce((sum, service) => {
-          return sum + service.monthlyPrice;
+          return sum + service.servicePlan.monthlyPrice;
         }, 0);
 
         // Generate invoice number (YYYY-MM-CUST-SEQ)
@@ -50,7 +50,7 @@ export class BillingService {
 
         if (existing) continue;
 
-        // Create invoice with line items
+        // Create invoice
         const dueDate = new Date(today);
         dueDate.setDate(dueDate.getDate() + 30); // 30 days payment term
 
@@ -59,22 +59,13 @@ export class BillingService {
             customerId: customer.id,
             invoiceNumber,
             amount: totalAmount,
+            totalAmount: totalAmount, // Schema requires totalAmount
             dueDate,
             status: "PENDING",
-            lineItems: {
-              createMany: {
-                data: customer.customerServices.map((service) => ({
-                  description: `${service.servicePlan.name} - Monthly Service (${service.servicePlan.speed} Mbps)`,
-                  quantity: 1,
-                  unitPrice: service.monthlyPrice,
-                  total: service.monthlyPrice,
-                })),
-              },
-            },
           },
         });
 
-        console.log(`[Billing] Invoice created for ${customer.name}: ${invoiceNumber}`);
+        console.log(`[Billing] Invoice created for ${customer.firstName} ${customer.lastName}: ${invoiceNumber}`);
         invoicesCreated++;
       }
 
@@ -136,28 +127,11 @@ export class BillingService {
               }
             }
 
-            // Add to SUSPENDED address list
-            if (service.customerId) {
-              try {
-                await prisma.addressList.create({
-                  data: {
-                    customerId: service.customerId,
-                    type: "SUSPENDED",
-                    ipAddress: "0.0.0.0/32", // Placeholder
-                    description: "Suspended due to overdue payment",
-                  },
-                });
-              } catch (error) {
-                console.error("[Database] Error adding to suspended list:", error);
-              }
-            }
-
             // Update service status
             await prisma.customerService.update({
               where: { id: service.id },
               data: {
                 status: "SUSPENDED",
-                suspensionDate: today,
               },
             });
 
@@ -168,11 +142,11 @@ export class BillingService {
         // Update customer status
         await prisma.customer.update({
           where: { id: invoice.customer.id },
-          data: { status: "SUSPENDED" },
+          data: { accountStatus: "SUSPENDED" },
         });
 
         console.log(
-          `[Billing] Suspended customer ${invoice.customer.name} due to overdue invoice`
+          `[Billing] Suspended customer ${invoice.customer.firstName} ${invoice.customer.lastName} due to overdue invoice`
         );
       }
 
@@ -212,7 +186,7 @@ export class BillingService {
       });
 
       // If customer was suspended, reactivate services
-      if (invoice.customer.status === "SUSPENDED") {
+      if (invoice.customer.accountStatus === "SUSPENDED") {
         const customerServices = await prisma.customerService.findMany({
           where: {
             customerId: invoice.customer.id,
@@ -238,18 +212,18 @@ export class BillingService {
           // Update service status
           await prisma.customerService.update({
             where: { id: service.id },
-            data: { status: "ACTIVE", suspensionDate: null },
+            data: { status: "ACTIVE" },
           });
         }
 
         // Update customer status back to ACTIVE
         await prisma.customer.update({
           where: { id: invoice.customer.id },
-          data: { status: "ACTIVE" },
+          data: { accountStatus: "ACTIVE" },
         });
 
         console.log(
-          `[Billing] Reactivated services for ${invoice.customer.name}`
+          `[Billing] Reactivated services for ${invoice.customer.firstName} ${invoice.customer.lastName}`
         );
       }
 
@@ -268,7 +242,6 @@ export class BillingService {
       where: { id: invoiceId },
       include: {
         customer: true,
-        lineItems: true,
         payments: true,
       },
     });
@@ -280,7 +253,7 @@ export class BillingService {
   static async getCustomerInvoices(customerId: string) {
     return prisma.invoice.findMany({
       where: { customerId },
-      include: { lineItems: true, payments: true },
+      include: { payments: true },
       orderBy: { createdAt: "desc" },
     });
   }

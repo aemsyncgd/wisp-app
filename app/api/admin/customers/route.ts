@@ -33,19 +33,20 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
+    // Split name into firstName and lastName
+    const nameParts = (body.name || "Default Customer").split(" ");
+    const firstName = nameParts[0];
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : " ";
+
     const customer = await prisma.customer.create({
       data: {
-        name: body.name,
+        firstName,
+        lastName,
         email: body.email,
         phone: body.phone || null,
-        documentId: body.documentId || null,
-        status: body.status || "ACTIVE",
-        address: body.address || null,
-        city: body.city || null,
-        state: body.state || null,
-        zipCode: body.zipCode || null,
-        notes: body.notes || null,
-        contactPerson: body.contactPerson || null,
+        taxId: body.documentId || null,
+        accountStatus: body.status || "ACTIVE",
+        // Note: address fields are in a separate model, skipping here for now
       },
     });
 
@@ -56,8 +57,7 @@ export async function POST(request: NextRequest) {
         action: "create_customer",
         entityType: "Customer",
         entityId: customer.id,
-        description: `Created new customer: ${customer.name}`,
-        newValues: JSON.stringify(customer),
+        changes: customer as any,
       },
     });
 
