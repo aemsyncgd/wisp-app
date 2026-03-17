@@ -72,7 +72,6 @@
     "zod": "3.25.76"
   },
   "devDependencies": {
-    "@prisma/cli": "^5.22.0",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
