@@ -1,6 +1,7 @@
 import type { NextAuthConfig } from "next-auth";
 
 export const authConfig = {
+  secret: process.env.NEXTAUTH_SECRET,
   providers: [
     // We'll add the real Credentials provider in auth.ts to avoid Edge Runtime issues with bcrypt
   ],
