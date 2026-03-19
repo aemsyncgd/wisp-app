@@ -4,7 +4,7 @@
  * Creates the admin user and initial data
  */
 
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../lib/prisma.js";
 import bcrypt from "bcryptjs";
 
 async function main() {
@@ -12,7 +12,7 @@ async function main() {
 
   try {
     // Create default admin user
-    const adminPassword = await bcrypt.hash("admin123", 10);
+    const adminPassword = await bcrypt.hash("demo1234", 10);
     const admin = await prisma.admin.upsert({
       where: { email: "admin@wisp.local" },
       update: {},
@@ -20,7 +20,7 @@ async function main() {
         email: "admin@wisp.local",
         password: adminPassword,
         name: "System Administrator",
-        role: "admin",
+        role: "ADMIN",
         active: true,
       },
     });
@@ -33,10 +33,11 @@ async function main() {
         update: {},
         create: {
           name: "Plan 10Mbps",
-          speed: 10,
-          price: 29.99,
+          downloadSpeed: 10,
+          uploadSpeed: 2,
+          monthlyPrice: 29.99,
           description: "10 Mbps download / 2 Mbps upload",
-          active: true,
+          isActive: true,
         },
       }),
       prisma.servicePlan.upsert({
@@ -44,10 +45,11 @@ async function main() {
         update: {},
         create: {
           name: "Plan 25Mbps",
-          speed: 25,
-          price: 49.99,
+          downloadSpeed: 25,
+          uploadSpeed: 5,
+          monthlyPrice: 49.99,
           description: "25 Mbps download / 5 Mbps upload",
-          active: true,
+          isActive: true,
         },
       }),
       prisma.servicePlan.upsert({
@@ -55,10 +57,11 @@ async function main() {
         update: {},
         create: {
           name: "Plan 50Mbps",
-          speed: 50,
-          price: 79.99,
+          downloadSpeed: 50,
+          uploadSpeed: 10,
+          monthlyPrice: 79.99,
           description: "50 Mbps download / 10 Mbps upload",
-          active: true,
+          isActive: true,
         },
       }),
     ]);
@@ -74,8 +77,7 @@ async function main() {
         port: 8728,
         username: "admin",
         password: "admin",
-        location: "Server Room",
-        active: true,
+        isActive: true,
       },
     });
     console.log("✓ Router configured:", router.name);
@@ -83,7 +85,7 @@ async function main() {
     console.log("\n✓ Database initialization completed successfully!");
     console.log("\nDefault credentials:");
     console.log("  Email: admin@wisp.local");
-    console.log("  Password: admin123");
+    console.log("  Password: demo1234");
     console.log("\n⚠️  Remember to change the default password in production!");
   } catch (error) {
     console.error("Error initializing database:", error);
